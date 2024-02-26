@@ -16,6 +16,7 @@ func Healthcheck(tm time.Duration) http.HandlerFunc{
 			ans := map[string]interface{}{
 				"status": "ok",
 			}
+			w.Header().Add("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			jsonResponse, _ := json.Marshal(ans)
 			w.Write(jsonResponse)

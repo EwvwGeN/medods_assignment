@@ -38,7 +38,6 @@ func main() {
 	app := app.ServerNewInstance(mainCtx, *cfg, logger, nil)
 	app.RunServer(mainCtx)
 
-
 	stopChecker := make(chan os.Signal, 1)
 	signal.Notify(stopChecker, syscall.SIGTERM, syscall.SIGINT)
 	<- stopChecker

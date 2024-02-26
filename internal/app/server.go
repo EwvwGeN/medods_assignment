@@ -20,9 +20,9 @@ type server struct {
 }
 
 type Auth interface {
-	RegisterUser()
-	LoginUser()
-	RefreshToken()
+	RegisterUser(email string) (uuid string, err error)
+	CreateTokenPair(uuid string) (token, refresh string, err error)
+	RefreshToken(oldRefresh string) (newToken, newRefresh string, err error)
 }
 
 func ServerNewInstance(ctx context.Context, cfg config.Config, log *slog.Logger, auth Auth) *server {
@@ -55,10 +55,28 @@ func (s *server) RunServer(ctx context.Context) (errCloseCh chan error) {
 			}
 		}
 	}()
-	srv.ListenAndServe()
+	go srv.ListenAndServe()
 	return
 }
 
 func (s *server) configureRouter() {
-	s.router.HandleFunc("/api/healthchecker", v1.Healthcheck(s.cfg.HttpConfig.PingTimeout))
+	s.router.HandleFunc(
+		"/api/healthchecker",
+		v1.Healthcheck(s.cfg.HttpConfig.PingTimeout)).
+	Methods(http.MethodGet)
+
+	s.router.HandleFunc(
+		"/api/register",
+		s.RegisterUser()).
+	Methods(http.MethodPost)
+
+	s.router.HandleFunc(
+		"/api/createTokenPair/{uuid:[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$}",
+		s.CreateTokenPair()).
+	Methods(http.MethodGet)
+
+	s.router.HandleFunc(
+		"/api/refreshToken",
+		s.RefrashToken()).
+	Methods(http.MethodPost)
 }
