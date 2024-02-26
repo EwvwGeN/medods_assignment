@@ -1,0 +1,5 @@
+log_level: debug
+http:
+  port: 9009
+  host: localhost
+  ping_timeout: 1s
