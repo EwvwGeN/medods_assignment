@@ -19,10 +19,10 @@ type Auth struct {
 }
 
 type UserRepo interface {
-	SaveUser(email, uuid string) (err error)
-	GetUserByRefresh(refresh string) (user *models.User, err error)
-	SaveRefreshToken(uuid, refresh string) (err error)
-	GetUserByUUID(uuid string) (user *models.User, err error)
+	SaveUser(ctx context.Context, email, uuid string) (err error)
+	GetUserByRefresh(ctx context.Context, refresh string) (user *models.User, err error)
+	SaveRefreshToken(ctx context.Context, uuid, refresh string) (err error)
+	GetUserByUUID(ctx context.Context, uuid string) (user *models.User, err error)
 }
 
 type JwtManager interface {
@@ -46,7 +46,7 @@ func (a *Auth) RegisterUser(email string) (uuid string, err error) {
 		log.Error(ErrCreateUUID.Error())
 		return "", fmt.Errorf("cant register user: %w", ErrCreateUUID)
 	}
-	err = a.userRepo.SaveUser(email, uuid)
+	err = a.userRepo.SaveUser(context.Background(), email, uuid)
 	if err != nil {
 		log.Warn("cant register user", slog.String("error", err.Error()))
 		return "", ErrSaveUser
