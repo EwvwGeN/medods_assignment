@@ -74,7 +74,7 @@ func (m *mongoProvider) GetUserByUUID(ctx context.Context, uuid string) (user *m
 	return &models.User{}, ErrUserNotFound
 }
 
-func (m *mongoProvider) GetUserByRefresh(ctx context.Context, refresh string) (user *models.User, err error) {
+func (m *mongoProvider) GetUserByRefresh(ctx context.Context, refresh []byte) (user *models.User, err error) {
 	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.M{
 		"$and": []interface{}{
 			bson.D{
@@ -96,7 +96,7 @@ func (m *mongoProvider) GetUserByRefresh(ctx context.Context, refresh string) (u
 	return &models.User{}, ErrRefresh
 }
 
-func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid, refresh string) (err error) {
+func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid string, refresh []byte) (err error) {
 	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.D{{Key: "uuid", Value: uuid}})
 	if raw, _ := findedUser.Raw(); raw == nil {
 		return ErrUserNotFound
