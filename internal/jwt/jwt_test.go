@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/EwvwGeN/medods_assignment/internal/domain/models"
-	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 )
@@ -35,12 +34,8 @@ func (suite *testSuite) Test_CreateTokenHappyPass(){
 	creatingTime := time.Now()
 	suite.Require().NoError(err)
 	suite.Require().NotEmpty(token)
-	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
-		return []byte(suite.secretKey), nil
-	})
+	claims, err := suite.jwtManager.ParseTokenClaims(token)
 	suite.Require().NoError(err)
-	claims, ok := parsedToken.Claims.(jwt.MapClaims)
-	suite.Require().True(ok)
 	suite.Equal(user.UUID, claims["uuid"].(string))
 	suite.Equal(user.Email, claims["email"].(string))
 	suite.InDelta(creatingTime.Add(duration).Unix(), claims["exp"].(float64), 1)

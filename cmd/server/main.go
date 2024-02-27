@@ -11,7 +11,10 @@ import (
 
 	"github.com/EwvwGeN/medods_assignment/internal/app"
 	c "github.com/EwvwGeN/medods_assignment/internal/config"
+	"github.com/EwvwGeN/medods_assignment/internal/jwt"
 	l "github.com/EwvwGeN/medods_assignment/internal/logger"
+	"github.com/EwvwGeN/medods_assignment/internal/service"
+	"github.com/EwvwGeN/medods_assignment/internal/storage"
 )
 
 var (
@@ -35,7 +38,16 @@ func main() {
 	
 	mainCtx, cancel := context.WithCancel(context.Background())
 
-	app := app.ServerNewInstance(mainCtx, *cfg, logger, nil)
+	jwtManager := jwt.NewJwtManager(cfg.JwtSecret)
+
+	mongoDB, err := storage.NewMongoProvider(mainCtx, cfg.MongoConfig)
+	if err != nil {
+		panic("cant get mongo provider")
+	}
+
+	auth := service.NewAuth(mainCtx, logger, mongoDB, jwtManager, cfg.TokenTTL, cfg.RefreshTTL)
+
+	app := app.ServerNewInstance(mainCtx, *cfg, logger, auth)
 	app.RunServer(mainCtx)
 
 	stopChecker := make(chan os.Signal, 1)

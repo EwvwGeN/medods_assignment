@@ -4,6 +4,7 @@ import (
 	"fmt"
 	p "path"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -13,6 +14,10 @@ var serviceTag string = "auth_service"
 type Config struct {
 	LogLevel    string      `mapstructure:"log_level"`
 	HttpConfig  HttpConfig  `mapstructure:"http"`
+	MongoConfig MongoConfig `mapstructure:"mongo"`
+	TokenTTL time.Duration `mapstructure:"token_ttl"`
+	RefreshTTL time.Duration `mapstructure:"refresh_ttl"`
+	JwtSecret string `mapstructure:"jwt_secret"`
 }
 
 func LoadConfig(path string) (*Config, error) {

@@ -55,9 +55,9 @@ func NewMongoProvider(ctx context.Context, cfg config.MongoConfig) (*mongoProvid
 }
 
 func (m *mongoProvider) SaveUser(ctx context.Context, email, uuid string) (err error) {
-	_, err = m.db.Collection(m.cfg.UserCollection).InsertOne(ctx, models.User{
-		Email: email,
-		UUID: uuid,
+	_, err = m.db.Collection(m.cfg.UserCollection).InsertOne(ctx, bson.D{
+		{Key: "email", Value: email},
+		{Key: "uuid", Value: uuid},
 	})
 	if mongo.IsDuplicateKeyError(err) {
 		return ErrUserExist
@@ -68,35 +68,13 @@ func (m *mongoProvider) SaveUser(ctx context.Context, email, uuid string) (err e
 func (m *mongoProvider) GetUserByUUID(ctx context.Context, uuid string) (user *models.User, err error) {
 	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.D{{Key: "uuid", Value: uuid}})
 	if raw, _ := findedUser.Raw(); raw != nil {
-		findedUser.Decode(user)
+		findedUser.Decode(&user)
 		return user, nil
 	}
 	return &models.User{}, ErrUserNotFound
 }
 
-func (m *mongoProvider) GetUserByRefresh(ctx context.Context, refresh []byte) (user *models.User, err error) {
-	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.M{
-		"$and": []interface{}{
-			bson.D{
-				{Key: "refresh_token", Value: refresh},
-			},
-			bson.D{
-				{Key: "expires_at", Value: bson.M{"$gt": time.Now().Unix()}},
-			},
-		}},
-		options.FindOne().SetProjection(bson.D{
-			{Key: "refresh_token", Value: 0},
-			{Key: "expires_at", Value: 0},
-		}),
-	)
-	if raw, _ := findedUser.Raw(); raw != nil {
-		findedUser.Decode(user)
-		return user, nil
-	}
-	return &models.User{}, ErrRefresh
-}
-
-func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid string, refresh []byte, refreshTTL time.Duration) (err error) {
+func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid, refresh string, refreshTTL time.Duration) (err error) {
 	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.D{{Key: "uuid", Value: uuid}})
 	if raw, _ := findedUser.Raw(); raw == nil {
 		return ErrUserNotFound

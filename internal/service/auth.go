@@ -2,11 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/EwvwGeN/medods_assignment/internal/domain/models"
+	"github.com/EwvwGeN/medods_assignment/internal/storage"
+	"github.com/golang-jwt/jwt"
 	guuid "github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -22,14 +25,14 @@ type Auth struct {
 
 type UserRepo interface {
 	SaveUser(ctx context.Context, email, uuid string) (err error)
-	GetUserByRefresh(ctx context.Context, refresh []byte) (user *models.User, err error)
-	SaveRefreshToken(ctx context.Context, uuid string, refresh []byte, refreshTTL time.Duration) (err error)
+	SaveRefreshToken(ctx context.Context, uuid, refresh string, refreshTTL time.Duration) (err error)
 	GetUserByUUID(ctx context.Context, uuid string) (user *models.User, err error)
 }
 
 type JwtManager interface {
 	CreateJwt(user *models.User, ttl time.Duration) (token string, err error)
 	CreateRefresh() (refresh string, err error)
+	ParseTokenClaims(token string) (jwt.MapClaims, error) 
 }
 
 func NewAuth(ctx context.Context, log *slog.Logger, userRepo UserRepo, jwtManager JwtManager, tokenttl, refreshttl time.Duration) *Auth {
@@ -51,7 +54,11 @@ func (a *Auth) RegisterUser(email string) (uuid string, err error) {
 	}
 	err = a.userRepo.SaveUser(context.Background(), email, uuid)
 	if err != nil {
-		log.Warn("failed register user", slog.String("error", err.Error()))
+		if errors.Is(err, storage.ErrUserExist) {
+			log.Info("failed register user", slog.String("error", storage.ErrUserExist.Error()))
+			return "", fmt.Errorf("failed register user: %w", storage.ErrUserExist)
+		}
+		log.Warn("failed register user", slog.String("uuid", uuid), slog.String("error", err.Error()))
 		return "", fmt.Errorf("failed register user: %w", ErrSaveUser)
 	}
 	return
@@ -60,6 +67,7 @@ func (a *Auth) RegisterUser(email string) (uuid string, err error) {
 func (a *Auth) CreateTokenPair(uuid string) (token, refresh string, err error) {
 	log := a.log.With(slog.String("auth.method", "create_token_pair"))
 	user, err:= a.userRepo.GetUserByUUID(context.Background(), uuid)
+	log.Debug("got user", slog.Any("user", user))
 	if err != nil {
 		log.Warn(ErrGetUserUUID.Error(), slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed create token pair: %w", ErrGetUserUUID)
@@ -79,7 +87,8 @@ func (a *Auth) CreateTokenPair(uuid string) (token, refresh string, err error) {
 		log.Error("failed to generate refresh hash", slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed create token pair: %w", err)
 	}
-	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, refreshHash, a.refreshTTL)
+	log.Debug("creted refresh hash", slog.String("hash", string(refreshHash)))
+	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, string(refreshHash), a.refreshTTL)
 	if err != nil {
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed create token pair: %w", err)
@@ -87,19 +96,32 @@ func (a *Auth) CreateTokenPair(uuid string) (token, refresh string, err error) {
 	return
 }
 
-func (a *Auth) RefreshToken(oldRefresh string) (newToken, newRefresh string, err error) {
+func (a *Auth) RefreshToken(accessToken, refreshToken string) (newToken, newRefresh string, err error) {
 	log := a.log.With(slog.String("auth.method", "refresh_token"))
-
-	oldRefreshHash, err := bcrypt.GenerateFromPassword([]byte(oldRefresh), bcrypt.DefaultCost)
+	log.Debug("start refreshing", slog.String("access_token", accessToken), slog.String("refresh_token", refreshToken))
+	tokenClaims, err := a.jwtManager.ParseTokenClaims(accessToken)
 	if err != nil {
-		log.Error("failed to generate old refresh hash", slog.String("error", err.Error()))
+		log.Info("not valid access token", slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed refresh token: %w", err)
 	}
-
-	user, err := a.userRepo.GetUserByRefresh(context.Background(), oldRefreshHash)
+	uuid, ok := tokenClaims["uuid"]
+	if !ok {
+		log.Info("cant get uuid from token claims")
+		return "", "", fmt.Errorf("failed refresh token: %w", ErrValidAccess)
+	}
+	queryTime := time.Now().Unix()
+	user, err := a.userRepo.GetUserByUUID(context.Background(), uuid.(string))
+	log.Debug("gor user by uuid", slog.Any("user", user))
 	if err != nil {
-		log.Warn(ErrGetUserRefresh.Error(), slog.String("error", err.Error()))
-		return "", "", fmt.Errorf("failed refresh token: %w", ErrGetUserRefresh)
+		log.Warn(ErrGetUserUUID.Error(), slog.String("error", err.Error()))
+		return "", "", fmt.Errorf("failed refresh token: %w", ErrGetUserUUID)
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(user.RefreshHash), []byte(refreshToken))
+	if err != nil {
+		return "", "", fmt.Errorf("failed refresh token: %w", ErrValidRefresh)
+	}
+	if queryTime > user.ExpiresAt {
+		return "", "", fmt.Errorf("failed refresh token: %w", ErrValidRefresh)
 	}
 	newToken, err = a.jwtManager.CreateJwt(user, a.tokenTTL)
 	if err != nil {
@@ -116,7 +138,7 @@ func (a *Auth) RefreshToken(oldRefresh string) (newToken, newRefresh string, err
 		log.Error("failed to generate new refresh hash", slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed refresh token: %w", err)
 	}
-	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, newRefreshHash, a.refreshTTL)
+	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, string(newRefreshHash), a.refreshTTL)
 	if err != nil {
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed refresh token: %w", err)

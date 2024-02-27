@@ -2,10 +2,12 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/EwvwGeN/medods_assignment/internal/domain/models"
+	"github.com/EwvwGeN/medods_assignment/internal/storage"
 	"github.com/gorilla/mux"
 )
 
@@ -25,7 +27,12 @@ func (s *server) RegisterUser() http.HandlerFunc {
 		}
 		uuid, err := s.auth.RegisterUser(req.Email)
 		if err != nil {
-			log.Info("error while registration", slog.String("email", req.Email), slog.String("error", err.Error()))
+			if errors.Is(err, storage.ErrUserExist) {
+				log.Info("error while registration", slog.String("email", req.Email), slog.String("error", storage.ErrUserExist.Error()))
+				http.Error(w, "error while registration: user exist", http.StatusBadRequest)
+				return
+			}
+			log.Warn("error while registration", slog.String("email", req.Email), slog.String("error", err.Error()))
 			http.Error(w, "error while registration", http.StatusInternalServerError)
 			return
 		}
@@ -54,6 +61,7 @@ func (s *server) CreateTokenPair() http.HandlerFunc {
 			http.Error(w, "cant get uuid", http.StatusBadRequest)
 			return
 		}
+		log.Debug("got uuid", slog.String("uuid", uuid))
 		token, refresh, err := s.auth.CreateTokenPair(uuid)
 		if err != nil {
 			log.Info("cant create token pair", slog.String("uuid", uuid), slog.String("error", err.Error()))
@@ -85,12 +93,17 @@ func (s *server) RefrashToken() http.HandlerFunc {
 			http.Error(w, "error while decoidng response object", http.StatusBadRequest)
 			return
 		}
-		if req.RefreshToken == "" {
+		if req.TokenPair.RefreshToken == "" {
 			log.Info("empty refresh token in request")
 			http.Error(w, "refresh token cant be empty", http.StatusBadRequest)
 			return
 		}
-		token, refresh, err := s.auth.RefreshToken(req.RefreshToken)
+		if req.TokenPair.AccessToken == "" {
+			log.Info("empty access token in request")
+			http.Error(w, "access token cant be empty", http.StatusBadRequest)
+			return
+		}
+		token, refresh, err := s.auth.RefreshToken(req.TokenPair.AccessToken, req.TokenPair.RefreshToken)
 		if err != nil {
 			log.Info("cant refresh token", slog.String("error", err.Error()))
 			http.Error(w, "cant refresh token", http.StatusInternalServerError)

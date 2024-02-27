@@ -3,3 +3,15 @@ http:
   port: 9009
   host: localhost
   ping_timeout: 1s
+mongo:
+  db_con_format: mongodb
+  db_host: localhost
+  db_port: 27017
+  db_user: ttt
+  db_pass: ttt
+  db_auth_source: testTT
+  db_name: testTT
+  db_col_user: user
+token_ttl: 10m
+refresh_ttl: 10h
+jwt_secret: test-secret-key

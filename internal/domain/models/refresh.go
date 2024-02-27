@@ -1,7 +1,7 @@
 package models
 
 type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	TokenPair TokenPair `json:"token_pair"`
 }
 
 type RefreshResponse struct {

@@ -22,7 +22,7 @@ type server struct {
 type Auth interface {
 	RegisterUser(email string) (uuid string, err error)
 	CreateTokenPair(uuid string) (token, refresh string, err error)
-	RefreshToken(oldRefresh string) (newToken, newRefresh string, err error)
+	RefreshToken(accessToken, refreshToken string) (newToken, newRefresh string, err error)
 }
 
 func ServerNewInstance(ctx context.Context, cfg config.Config, log *slog.Logger, auth Auth) *server {

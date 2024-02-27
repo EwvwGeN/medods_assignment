@@ -46,3 +46,17 @@ func (jm *jwtManager) CreateRefresh() (refresh string, err error) {
 	}
 	return fmt.Sprintf("%x", buffer), nil
 }
+
+func (jm *jwtManager) ParseTokenClaims(token string) (jwt.MapClaims, error) {
+	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+		return []byte(jm.secretKey), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, ErrParseClaims
+	}
+	return claims, nil
+}
