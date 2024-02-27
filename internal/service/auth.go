@@ -16,13 +16,14 @@ type Auth struct {
 	userRepo UserRepo
 	jwtManager JwtManager
 	tokenTTL time.Duration
+	refreshTTL time.Duration
 
 }
 
 type UserRepo interface {
 	SaveUser(ctx context.Context, email, uuid string) (err error)
 	GetUserByRefresh(ctx context.Context, refresh []byte) (user *models.User, err error)
-	SaveRefreshToken(ctx context.Context, uuid string, refresh []byte) (err error)
+	SaveRefreshToken(ctx context.Context, uuid string, refresh []byte, refreshTTL time.Duration) (err error)
 	GetUserByUUID(ctx context.Context, uuid string) (user *models.User, err error)
 }
 
@@ -31,12 +32,13 @@ type JwtManager interface {
 	CreateRefresh() (refresh string, err error)
 }
 
-func NewAuth(ctx context.Context, log *slog.Logger, userRepo UserRepo, jwtManager JwtManager, tokenttl time.Duration) *Auth {
+func NewAuth(ctx context.Context, log *slog.Logger, userRepo UserRepo, jwtManager JwtManager, tokenttl, refreshttl time.Duration) *Auth {
 	return &Auth{
 		log: log,
 		userRepo: userRepo,
 		jwtManager: jwtManager,
 		tokenTTL: tokenttl,
+		refreshTTL: refreshttl,
 	}
 }
 
@@ -77,7 +79,7 @@ func (a *Auth) CreateTokenPair(uuid string) (token, refresh string, err error) {
 		log.Error("failed to generate refresh hash", slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed create token pair: %w", err)
 	}
-	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, refreshHash)
+	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, refreshHash, a.refreshTTL)
 	if err != nil {
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed create token pair: %w", err)
@@ -114,7 +116,7 @@ func (a *Auth) RefreshToken(oldRefresh string) (newToken, newRefresh string, err
 		log.Error("failed to generate new refresh hash", slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed refresh token: %w", err)
 	}
-	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, newRefreshHash)
+	err = a.userRepo.SaveRefreshToken(context.Background(), user.UUID, newRefreshHash, a.refreshTTL)
 	if err != nil {
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed refresh token: %w", err)

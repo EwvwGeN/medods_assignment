@@ -96,7 +96,7 @@ func (m *mongoProvider) GetUserByRefresh(ctx context.Context, refresh []byte) (u
 	return &models.User{}, ErrRefresh
 }
 
-func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid string, refresh []byte) (err error) {
+func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid string, refresh []byte, refreshTTL time.Duration) (err error) {
 	findedUser := m.db.Collection(m.cfg.UserCollection).FindOne(ctx, bson.D{{Key: "uuid", Value: uuid}})
 	if raw, _ := findedUser.Raw(); raw == nil {
 		return ErrUserNotFound
@@ -107,7 +107,7 @@ func (m *mongoProvider) SaveRefreshToken(ctx context.Context, uuid string, refre
 	bson.D{
 		{Key: "$set", Value: bson.D{
 			{Key: "refresh_token", Value: refresh},
-			{Key: "expires_at", Value: time.Now().Unix()}},
+			{Key: "expires_at", Value: time.Now().Add(refreshTTL).Unix()}},
 		},
 	})
 	if err != nil {
