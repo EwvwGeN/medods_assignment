@@ -1,0 +1,49 @@
+version: "3.7"
+
+services:
+  mongo:
+    image: "mongo:7.0.4"
+    restart: always
+    env_file:
+      .env
+    ports:
+      - 27017:27017
+    environment:
+    # You nedd to pass next env variables in .env file:
+    # MONGO_NEWUSER_NAME
+    # MONGO_NEWUSER_PASSWORD
+    # MONGO_INITDB_NAME
+    # MONGO_INITDB_COL_USER
+    # MONGO_INITDB_COL_APP
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    volumes:
+      - ./storage/init/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://root:root@localhost:27017 --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - serviceNet
+
+  server:
+    env_file:
+      .env
+    environment:
+      MONGO.DB_PORT: 27017
+      MONGO.DB_HOST: mongo
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    ports:
+      - 9999:${HTTP_PORT}/tcp
+    depends_on:
+      mongo:
+        condition: "service_healthy"
+    networks:
+      - serviceNet
+
+networks:
+  serviceNet:
+    driver: bridge
