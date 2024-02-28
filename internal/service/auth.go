@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -93,6 +94,7 @@ func (a *Auth) CreateTokenPair(uuid string) (token, refresh string, err error) {
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed create token pair: %w", err)
 	}
+	refresh = base64.StdEncoding.EncodeToString([]byte(refresh))
 	return
 }
 
@@ -116,6 +118,11 @@ func (a *Auth) RefreshToken(accessToken, refreshToken string) (newToken, newRefr
 		log.Warn(ErrGetUserUUID.Error(), slog.String("error", err.Error()))
 		return "", "", fmt.Errorf("failed refresh token: %w", ErrGetUserUUID)
 	}
+	refreshBytes, err := base64.StdEncoding.DecodeString(refreshToken)
+	if err != nil {
+		return "", "", ErrValidRefresh
+	}
+	refreshToken = string(refreshBytes)
 	err = bcrypt.CompareHashAndPassword([]byte(user.RefreshHash), []byte(refreshToken))
 	if err != nil {
 		return "", "", fmt.Errorf("failed refresh token: %w", ErrValidRefresh)
@@ -143,5 +150,6 @@ func (a *Auth) RefreshToken(accessToken, refreshToken string) (newToken, newRefr
 		log.Error("failed to save refresh token")
 		return "", "", fmt.Errorf("failed refresh token: %w", err)
 	}
+	newRefresh = base64.StdEncoding.EncodeToString([]byte(newRefresh))
 	return
 }
