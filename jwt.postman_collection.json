@@ -1,0 +1,55 @@
+{
+	"info": {
+		"_postman_id": "2bb9566d-dbb8-4bb8-b413-c2f96d0dc601",
+		"name": "jwt",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "27700701"
+	},
+	"item": [
+		{
+			"name": "register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\": \"\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "0.0.0.0:9999/api/register"
+			},
+			"response": []
+		},
+		{
+			"name": "createToken",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "0.0.0.0:9999/api/createTokenPair/"
+			},
+			"response": []
+		},
+		{
+			"name": "refresh",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"token_pair\": {\r\n        \"access_token\": \"\",\r\n        \"refresh_token\": \"\"\r\n    }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "0.0.0.0:9999/api/refreshToken"
+			},
+			"response": []
+		}
+	]
+}
